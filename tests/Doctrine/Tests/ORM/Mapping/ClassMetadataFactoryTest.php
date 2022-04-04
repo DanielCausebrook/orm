@@ -6,6 +6,9 @@ use Doctrine\Tests\Mocks\MetadataDriverMock;
 use Doctrine\Tests\Mocks\EntityManagerMock;
 use Doctrine\Tests\Mocks\ConnectionMock;
 use Doctrine\Tests\Mocks\DriverMock;
+use Doctrine\Tests\Models\JoinedInheritanceTypeWithAssociation\InvalidToManyOnMappedSuperclass;
+use Doctrine\Tests\Models\JoinedInheritanceTypeWithAssociation\RootEntity;
+use Doctrine\Tests\Models\JoinedInheritanceTypeWithAssociation\ValidToManyOnRoot;
 use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\Common\EventManager;
 use Doctrine\ORM\Mapping\ClassMetadataFactory;
@@ -87,6 +90,36 @@ class ClassMetadataFactoryTest extends \Doctrine\Tests\OrmTestCase
         $this->setExpectedException("Doctrine\ORM\ORMException");
 
         $actual = $cmf->getMetadataFor($cm1->name);
+    }
+
+    public function testGetMetadataForJoinedSuperclassWithToManyAssociationAndChildMappedSuperclass()
+    {
+        $cmf    = new ClassMetadataFactory();
+        $driver = $this->createAnnotationDriver([__DIR__ . '/../../Models/JoinedInheritanceType/']);
+        $em     = $this->createEntityManager($driver);
+        $cmf->setEntityManager($em);
+
+        $rootMetadata       = $cmf->getMetadataFor(RootEntity::class);
+        $childMetadata      = $cmf->getMetadataFor(ValidToManyOnRoot\ChildMappedSuperclass::class);
+        $grandchildMetadata = $cmf->getMetadataFor(ValidToManyOnRoot\GrandchildEntity::class);
+
+        self::assertTrue($rootMetadata->hasAssociation('toManyAssociation'));
+        self::assertTrue($childMetadata->hasAssociation('toManyAssociation'));
+        self::assertTrue($grandchildMetadata->hasAssociation('toManyAssociation'));
+    }
+
+    public function testThrowsExceptionForToManyOnGrandparentMappedSuperclass()
+    {
+        $cmf    = new ClassMetadataFactory();
+        $driver = $this->createAnnotationDriver([__DIR__ . '/../../Models/JoinedInheritanceType/']);
+        $em     = $this->createEntityManager($driver);
+        $cmf->setEntityManager($em);
+
+        $rootMetadata = $cmf->getMetadataFor(RootEntity::class);
+        self::expectException(MappingException::class);
+        $mappedSuperclass1Metadata = $cmf->getMetadataFor(InvalidToManyOnMappedSuperclass\ChildMappedSuperclass::class);
+        $mappedSuperclass2Metadata = $cmf->getMetadataFor(InvalidToManyOnMappedSuperclass\GrandchildMappedSuperclass::class);
+        $grandchildMetadata        = $cmf->getMetadataFor(InvalidToManyOnMappedSuperclass\GreatGrandchildEntity::class);
     }
 
     public function testHasGetMetadata_NamespaceSeparatorIsNotNormalized()
